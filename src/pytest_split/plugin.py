@@ -166,6 +166,8 @@ class PytestSplitPlugin(Base):
         group = groups[group_idx - 1]
 
         ensure_ipynb_compatibility(group, items)
+        #for i in items:
+            #print(f"{i}: {i.get_closest_marker('order')} - {i.get_closest_marker('xdist_group')}")
 
         items[:] = group.selected
         config.hook.pytest_deselected(items=group.deselected)
@@ -180,6 +182,8 @@ class PytestSplitPlugin(Base):
                 f"[pytest-split] Running group {group_idx}/{splits} (estimated duration: {group.duration:.2f}s)\n"
             )
         )
+
+
 
 
 class PytestSplitCachePlugin(Base):

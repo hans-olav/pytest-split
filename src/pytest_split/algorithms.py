@@ -84,6 +84,76 @@ def least_duration(
         groups.append(group)
     return groups
 
+def _get_load_group(item: "nodes.Item") -> str:
+    mark = item.get_closest_marker("xdist_group")
+    if not mark:
+        return item.nodeid
+    elif len(mark.args) > 0:
+        return mark.args[0]
+    else:
+        return mark.kwargs.get("name", "default")
+
+def _get_items_in_load_groups(items: "List[Tuple[nodes.Item, float]]") -> "Dict[str, Tuple[List[nodes.Item], float]]":
+    items_in_groups = {}
+    for item in items:
+        group = _get_load_group(item[0])
+        if group not in items_in_groups:
+            items_in_groups[group] = ([], 0.0)
+        
+        tup = items_in_groups[group]       
+        tup[0].append(item[0])
+        items_in_groups[group] = (tup[0], tup[1] + item[1])
+    return items_in_groups
+
+def preserve_xdist_groups(
+    splits: int, items: "List[nodes.Item]", durations: "Dict[str, float]"
+) -> "List[TestGroup]":
+    """
+    Preserves xdist groups.
+
+    :param splits: How many groups we're splitting in.
+    :param items: Test items passed down by Pytest.
+    :param durations: Our cached test runtimes. Assumes contains timings only of relevant tests
+    :return: List of groups
+    """
+    items_with_durations = _get_items_with_durations(items, durations)
+    group_dict = _get_items_in_load_groups(items_with_durations)
+    items_in_groups = [(key, value[0], value[1]) for key, value in group_dict.items()]
+
+    # Descending by time
+    sorted_groups = sorted(
+        items_in_groups, key=lambda tup: tup[2], reverse=True
+    )
+
+    selected: List[List[nodes.Item]] = [[] for _ in range(splits)]
+    deselected: List[List[nodes.Item]] = [[] for _ in range(splits)]
+    duration: List[float] = [0 for _ in range(splits)]
+
+    # create a heap of the form (summed_durations, group_index)
+    heap: List[Tuple[float, int]] = [(0, i) for i in range(splits)]
+    heapq.heapify(heap)
+    for group, items, group_duration in sorted_groups:
+        # get group with smallest sum
+        summed_durations, group_idx = heapq.heappop(heap)
+        new_group_durations = summed_durations + group_duration
+
+        # store assignment
+        duration[group_idx] = new_group_durations
+        for item in items:
+            selected[group_idx].append(item)        
+            for i in range(splits):
+                if i != group_idx:
+                    deselected[i].append(item)
+
+        # store new duration - in case of ties it sorts by the group_idx
+        heapq.heappush(heap, (new_group_durations, group_idx))
+
+    groups = []
+    for i in range(splits):
+        group = TestGroup(selected=selected[i], deselected=deselected[i], duration=duration[i])
+        groups.append(group)
+    return groups
+
 
 def duration_based_chunks(
     splits: int, items: "List[nodes.Item]", durations: "Dict[str, float]"
@@ -156,6 +226,7 @@ class Algorithms(enum.Enum):
     # values have to wrapped inside functools to avoid them being considered method definitions
     duration_based_chunks = functools.partial(duration_based_chunks)
     least_duration = functools.partial(least_duration)
+    preserve_xdist_groups = functools.partial(preserve_xdist_groups)
 
     @staticmethod
     def names() -> "List[str]":
