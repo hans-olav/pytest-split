@@ -8,6 +8,7 @@ from _pytest.reports import TestReport
 
 from pytest_split import algorithms
 from pytest_split.ipynb_compatibility import ensure_ipynb_compatibility
+import sys
 
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Union
@@ -20,6 +21,9 @@ if TYPE_CHECKING:
 
 # Ugly hack for freezegun compatibility: https://github.com/spulec/freezegun/issues/286
 STORE_DURATIONS_SETUP_AND_TEARDOWN_THRESHOLD = 60 * 10  # seconds
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 def pytest_addoption(parser: "Parser") -> None:
@@ -170,10 +174,10 @@ class PytestSplitPlugin(Base):
         items[:] = group.selected
         config.hook.pytest_deselected(items=group.deselected)
 
-        print(f"\n\n[pytest-split] Splitting tests with algorithm: {config.option.splitting_algorithm}")
-        print(f"[pytest-split] Running group {group_idx}/{splits} (estimated duration: {group.duration:.2f}s)\n")
-        for i in items:
-            print(f"{i}: {i.get_closest_marker('order')} - {i.get_closest_marker('xdist_group')}")
+        eprint(f"\n\n[pytest-split] Splitting tests with algorithm: {config.option.splitting_algorithm}")
+        eprint(f"[pytest-split] Running group {group_idx}/{splits} (estimated duration: {group.duration:.2f}s)\n")
+        #for i in items:
+         #   eprint(f"{i}: {i.get_closest_marker('order')} - {i.get_closest_marker('xdist_group')}")
 
 
 class PytestSplitCachePlugin(Base):

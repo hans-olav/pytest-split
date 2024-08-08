@@ -3,11 +3,15 @@ import functools
 import heapq
 from operator import itemgetter
 from typing import TYPE_CHECKING, NamedTuple
+import sys
 
 if TYPE_CHECKING:
     from typing import Dict, List, Tuple
 
     from _pytest import nodes
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 class TestGroup(NamedTuple):
@@ -137,10 +141,13 @@ def preserve_xdist_groups(
         summed_durations, group_idx = heapq.heappop(heap)
         new_group_durations = summed_durations + group_duration
 
+        eprint (f"Assigned {group} with dur={group_duration} to group {group_idx} with dur {new_group_durations}")
+
         # store assignment
         duration[group_idx] = new_group_durations
         for item in items:
-            selected[group_idx].append(item)        
+            selected[group_idx].append(item)
+            eprint (f"    test: {item.name}")
             for i in range(splits):
                 if i != group_idx:
                     deselected[i].append(item)
@@ -149,9 +156,12 @@ def preserve_xdist_groups(
         heapq.heappush(heap, (new_group_durations, group_idx))
 
     groups = []
+    eprint()
+    eprint("GROUP SUMMARY:")
     for i in range(splits):
         group = TestGroup(selected=selected[i], deselected=deselected[i], duration=duration[i])
         groups.append(group)
+        eprint (f" {i}: {len(selected[i])} with dur {duration[i]}")
     return groups
 
 
